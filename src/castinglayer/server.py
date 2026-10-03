@@ -32,8 +32,10 @@ class _HLSHandler(SimpleHTTPRequestHandler):
     server: "_Server"
 
     def do_GET(self) -> None:  # noqa: N802
-        if self.path.split("?")[0].endswith(".ts"):
+        name = self.path.split("?")[0].rsplit("/", 1)[-1]
+        if name.endswith(".ts"):
             self.server.last_segment_at = time.monotonic()
+            self.server.last_segment = name
         super().do_GET()
 
     def log_message(self, format: str, *args) -> None:  # noqa: A002
@@ -43,6 +45,7 @@ class _HLSHandler(SimpleHTTPRequestHandler):
 
 class _Server(ThreadingHTTPServer):
     last_segment_at: float | None = None  # monotonic time the receiver last fetched a segment
+    last_segment: str | None = None
 
 
 class StreamServer:
@@ -59,6 +62,10 @@ class StreamServer:
     @property
     def last_segment_at(self) -> float | None:
         return self.httpd.last_segment_at
+
+    @property
+    def last_segment(self) -> str | None:
+        return self.httpd.last_segment
 
     def start(self) -> "StreamServer":
         self._thread.start()

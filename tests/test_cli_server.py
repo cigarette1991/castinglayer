@@ -48,23 +48,43 @@ def test_no_command_means_cast(monkeypatch):
     assert calls[1].device == "TV"
 
 
-def test_monitor_reloads_stalled_receiver(tmp_path):
+def test_monitor_reloads_only_when_receiver_is_stuck(tmp_path):
     from types import SimpleNamespace
     from castinglayer import cli
 
     (tmp_path / "seg_00001.ts").write_bytes(b"x")
+    playlist = tmp_path / "stream.m3u8"
     server = StreamServer(tmp_path, port=0, bind="127.0.0.1").start()
     try:
         assert server.last_segment_at is None
         urllib.request.urlopen(f"http://127.0.0.1:{server.port}/seg_00001.ts").read()
-        assert server.last_segment_at is not None
+        assert server.last_segment == "seg_00001.ts"
 
-        reloads = []
-        proc = SimpleNamespace(poll=lambda: 1 if reloads else None, returncode=0)
-        cast = SimpleNamespace(app_id=cli.MEDIA_RECEIVER_APP_ID,
-                               media_controller=SimpleNamespace(status=None))
-        cli._monitor(cast, proc, tmp_path / "log", server=server,
-                     reload=lambda: reloads.append(1), stall_after=0.1)
-        assert reloads == [1]
+        def run(segments):
+            playlist.write_text("".join(f"#EXTINF:2.0,\nseg_{n:05d}.ts\n" for n in segments))
+            mc = SimpleNamespace(status=SimpleNamespace(player_state="PLAYING", idle_reason=None),
+                                 update_status=lambda: None)
+            reloads, polls = [], []
+
+            def reload():
+                reloads.append(1)
+                # Reloading ends the old session; that must not be mistaken for the user stopping.
+                mc.status = SimpleNamespace(player_state="IDLE", idle_reason="INTERRUPTED")
+
+            def poll():
+                polls.append(1)
+                return 1 if len(polls) > 4 else None
+
+            cast = SimpleNamespace(app_id=cli.MEDIA_RECEIVER_APP_ID, media_controller=mc)
+            result = cli._monitor(cast, SimpleNamespace(poll=poll, returncode=1), tmp_path / "log",
+                                  server=server, reload=reload, playlist=playlist, stall_after=0.1)
+            return reloads, result
+
+        # Mac is slow: no new segments beyond the fetched one, so reloading would only hurt.
+        assert run([1]) == ([], 1)
+        # Receiver is stuck: segments are waiting but not fetched.
+        server.httpd.last_segment_at = 0
+        reloads, result = run([1, 2, 3, 4, 5])
+        assert reloads and result == 1  # kept casting after the reload
     finally:
         server.stop()

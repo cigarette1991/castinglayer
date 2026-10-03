@@ -89,6 +89,7 @@ castlayer cast -a "BlackHole 2ch"
 ## Limitations
 
 - **Delay:** Google Cast has no public API for live screen mirroring, so the video goes out as HLS. Expect about 5–8 seconds of delay. That is fine for presentations, videos and dashboards, but not for games. Shorter segments (`--segment-time 1`) cut the delay but made a Google TV freeze for about a minute at a time, so the default is 2 s.
+- **Freezes:** if the Mac is busy (a game, OBS), capture falls behind and the TV pauses until it catches up; `castlayer` prints a warning when this happens. If the TV itself gets stuck while video is waiting, `castlayer` reloads the stream automatically.
 - Older Chromecasts (generations 1–3) play up to 1080p at 30 fps. Ultra and Google TV models can take `--fps 60`.
 - Speaker groups and audio-only devices can't show video.
 - Your Mac and the Cast device must be able to reach each other on the LAN. Guest and client-isolated Wi-Fi networks block this.
