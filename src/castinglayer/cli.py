@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import platform
 import re
 import shutil
@@ -247,6 +248,8 @@ def cmd_cast(args) -> int:
               + (f", audio from {audio.name}" if audio else ""))
         log_file = open(log_path, "wb")
         ffmpeg_proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=log_file, stderr=log_file)
+        # Keep the Mac (and its display) awake for as long as this process casts.
+        subprocess.Popen(["caffeinate", "-dis", "-w", str(os.getpid())])
 
         server = StreamServer(work_dir, port=args.port, verbose=args.verbose).start()
         url = f"http://{lan_ip}:{server.port}/{PLAYLIST_NAME}"
@@ -261,7 +264,10 @@ def cmd_cast(args) -> int:
         _remember_device(name)
         _info(f"Live on {name}. Press Ctrl+C to stop.")
 
-        return _monitor(cast, ffmpeg_proc, log_path)
+        title = f"{socket.gethostname()} - {screen.name}"
+        return _monitor(cast, ffmpeg_proc, log_path, server=server,
+                        reload=lambda: play_hls(cast, url, title=title),
+                        stall_after=max(10.0, 5 * args.segment_time))
     except KeyboardInterrupt:
         _info("\nStopping...")
         return 0
@@ -309,9 +315,19 @@ def _wait_for_stream(proc, playlist: Path, log_path: Path, min_segments: int, ti
     raise CaptureError(f"Timed out waiting for the stream to start.\n{_log_tail(log_path)}")
 
 
-def _monitor(cast, proc, log_path: Path) -> int:
+def _monitor(cast, proc, log_path: Path, server=None, reload=None, stall_after: float = 10.0) -> int:
     seen_playing = False
     while True:
+        # The Google TV receiver sometimes stops fetching segments for minutes while still
+        # reporting PLAYING. Reloading the stream puts it back on the live edge.
+        last = server.last_segment_at if server is not None else None
+        if reload is not None and last is not None and time.monotonic() - last > stall_after:
+            _info("Receiver stalled; reloading the stream.")
+            server.httpd.last_segment_at = time.monotonic()
+            try:
+                reload()
+            except Exception as e:  # keep casting; the next stall check retries
+                _err(f"Reload failed: {e}")
         if proc.poll() is not None:
             _err(f"ffmpeg stopped unexpectedly (code {proc.returncode}):\n{_log_tail(log_path)}")
             return 1

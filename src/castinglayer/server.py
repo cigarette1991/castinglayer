@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import socket
 import threading
+import time
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -28,22 +29,36 @@ class _HLSHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     verbose = False
+    server: "_Server"
+
+    def do_GET(self) -> None:  # noqa: N802
+        if self.path.split("?")[0].endswith(".ts"):
+            self.server.last_segment_at = time.monotonic()
+        super().do_GET()
 
     def log_message(self, format: str, *args) -> None:  # noqa: A002
         if self.verbose:
             super().log_message(format, *args)
 
 
+class _Server(ThreadingHTTPServer):
+    last_segment_at: float | None = None  # monotonic time the receiver last fetched a segment
+
+
 class StreamServer:
     def __init__(self, directory: Path, port: int = 0, bind: str = "0.0.0.0", verbose: bool = False):
         handler = partial(type("_Handler", (_HLSHandler,), {"verbose": verbose}), directory=str(directory))
-        self.httpd = ThreadingHTTPServer((bind, port), handler)
+        self.httpd = _Server((bind, port), handler)
         self.httpd.daemon_threads = True
         self._thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
 
     @property
     def port(self) -> int:
         return self.httpd.server_address[1]
+
+    @property
+    def last_segment_at(self) -> float | None:
+        return self.httpd.last_segment_at
 
     def start(self) -> "StreamServer":
         self._thread.start()

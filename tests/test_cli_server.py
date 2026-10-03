@@ -46,3 +46,25 @@ def test_no_command_means_cast(monkeypatch):
     assert cli.main(["-d", "TV"]) == 0
     assert [a.command for a in calls] == ["cast", "cast"]
     assert calls[1].device == "TV"
+
+
+def test_monitor_reloads_stalled_receiver(tmp_path):
+    from types import SimpleNamespace
+    from castinglayer import cli
+
+    (tmp_path / "seg_00001.ts").write_bytes(b"x")
+    server = StreamServer(tmp_path, port=0, bind="127.0.0.1").start()
+    try:
+        assert server.last_segment_at is None
+        urllib.request.urlopen(f"http://127.0.0.1:{server.port}/seg_00001.ts").read()
+        assert server.last_segment_at is not None
+
+        reloads = []
+        proc = SimpleNamespace(poll=lambda: 1 if reloads else None, returncode=0)
+        cast = SimpleNamespace(app_id=cli.MEDIA_RECEIVER_APP_ID,
+                               media_controller=SimpleNamespace(status=None))
+        cli._monitor(cast, proc, tmp_path / "log", server=server,
+                     reload=lambda: reloads.append(1), stall_after=0.1)
+        assert reloads == [1]
+    finally:
+        server.stop()
