@@ -3,7 +3,7 @@
 # Castinglayer launcher, make it the home screen, and use the keyboard as a remote.
 #
 #   ./tv.sh pair 192.168.1.50:37123 123456   # Android 11+ "Wireless debugging" pairing
-#   ./tv.sh connect 192.168.1.50             # remembers the TV for later commands
+#   ./tv.sh connect [192.168.1.50]           # finds the TV itself if no IP; remembers it
 #   ./tv.sh install [path/to.apk]            # default: the APK built in app/build
 #   ./tv.sh set-home                         # make the launcher the Home screen
 #   ./tv.sh restore-home                     # put the stock launcher back
@@ -86,8 +86,28 @@ case "$cmd" in
     ;;
   connect)
     need_adb
-    [[ $# -eq 1 ]] || die "usage: $0 connect <tv-ip>[:port]"
-    addr="$1"; [[ "$addr" == *:* ]] || addr="$addr:5555"
+    addr="${1:-}"
+    if [[ -z "$addr" && -f "$TV_FILE" ]]; then
+      addr="$(cat "$TV_FILE")"
+    fi
+    if [[ -z "$addr" ]]; then
+      # Wireless debugging (Android 11+) advertises itself over mDNS once paired.
+      addr="$(adb mdns services 2>/dev/null | awk '/_adb-tls-connect/ {print $NF; exit}')"
+    fi
+    if [[ -z "$addr" ]]; then
+      # Older TVs: look for adb's classic port 5555 on this Wi-Fi network.
+      ip="$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}')"
+      [[ -n "$ip" ]] || die "not on a network? Pass the TV's IP: $0 connect <tv-ip>"
+      echo "Looking for the TV on ${ip%.*}.0/24..."
+      found="$(mktemp)"
+      for i in $(seq 1 254); do
+        (nc -z -w 1 "${ip%.*}.$i" 5555 >/dev/null 2>&1 && echo "${ip%.*}.$i:5555" >> "$found") &
+      done
+      wait
+      addr="$(head -1 "$found")"; rm -f "$found"
+      [[ -n "$addr" ]] || die "no TV found. Check USB/Wireless debugging is on, then: $0 connect <tv-ip>"
+    fi
+    [[ "$addr" == *:* ]] || addr="$addr:5555"
     adb connect "$addr"
     adb -s "$addr" get-state >/dev/null 2>&1 || die "couldn't reach $addr. Accept the 'Allow debugging?' prompt on the TV and retry."
     mkdir -p "$CONF_DIR"; echo "$addr" > "$TV_FILE"
