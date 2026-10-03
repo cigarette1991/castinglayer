@@ -27,13 +27,16 @@ class _HLSHandler(SimpleHTTPRequestHandler):
         self.send_response(204)
         self.end_headers()
 
+    verbose = False
+
     def log_message(self, format: str, *args) -> None:  # noqa: A002
-        pass
+        if self.verbose:
+            super().log_message(format, *args)
 
 
 class StreamServer:
-    def __init__(self, directory: Path, port: int = 0, bind: str = "0.0.0.0"):
-        handler = partial(_HLSHandler, directory=str(directory))
+    def __init__(self, directory: Path, port: int = 0, bind: str = "0.0.0.0", verbose: bool = False):
+        handler = partial(type("_Handler", (_HLSHandler,), {"verbose": verbose}), directory=str(directory))
         self.httpd = ThreadingHTTPServer((bind, port), handler)
         self.httpd.daemon_threads = True
         self._thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)

@@ -145,8 +145,8 @@ class CaptureSettings:
     fps: int = 30
     bitrate: str = "6M"
     encoder: str = "h264_videotoolbox"
-    segment_time: float = 1.0
-    list_size: int = 6
+    segment_time: float = 2.0
+    list_size: int = 10
     capture_cursor: bool = True
 
 

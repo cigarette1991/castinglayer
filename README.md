@@ -65,7 +65,7 @@ castlayer stop -d "Living Room"   # stop casting on a device
 | `--no-audio` | no audio track at all (by default a silent track is sent, for receiver compatibility) |
 | `-r/--resolution` | maximum output size; keeps the aspect ratio (`1920x1080`, `720p`, …) |
 | `--fps`, `-b/--bitrate` | frame rate and video bitrate (defaults: 30, `6M`) |
-| `--segment-time` | HLS segment length in seconds; lower means less delay |
+| `--segment-time` | HLS segment length in seconds (default 2). Lower means less delay, but at 1 s the TV's player stalls and freezes |
 | `--host IP` | contact a device by IP when mDNS discovery is blocked (repeatable) |
 | `--advertise-ip` | the IP the Cast device should fetch from (auto-detected by default) |
 | `--port` | HTTP port for the stream (random by default) |
@@ -88,7 +88,7 @@ castlayer cast -a "BlackHole 2ch"
 
 ## Limitations
 
-- **Delay:** Google Cast has no public API for live screen mirroring, so the video goes out as HLS. Expect about 3–6 seconds of delay. That is fine for presentations, videos and dashboards, but not for games. `--segment-time 0.5` lowers the delay a little.
+- **Delay:** Google Cast has no public API for live screen mirroring, so the video goes out as HLS. Expect about 5–8 seconds of delay. That is fine for presentations, videos and dashboards, but not for games. Shorter segments (`--segment-time 1`) cut the delay but made a Google TV freeze for about a minute at a time, so the default is 2 s.
 - Older Chromecasts (generations 1–3) play up to 1080p at 30 fps. Ultra and Google TV models can take `--fps 60`.
 - Speaker groups and audio-only devices can't show video.
 - Your Mac and the Cast device must be able to reach each other on the LAN. Guest and client-isolated Wi-Fi networks block this.

@@ -248,7 +248,7 @@ def cmd_cast(args) -> int:
         log_file = open(log_path, "wb")
         ffmpeg_proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=log_file, stderr=log_file)
 
-        server = StreamServer(work_dir, port=args.port).start()
+        server = StreamServer(work_dir, port=args.port, verbose=args.verbose).start()
         url = f"http://{lan_ip}:{server.port}/{PLAYLIST_NAME}"
         if args.verbose:
             _info(f"Serving {url}")
@@ -376,8 +376,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--fps", type=int, default=30, help="frames per second (default: 30)")
     sp.add_argument("-b", "--bitrate", default="6M", help="video bitrate (default: 6M)")
     sp.add_argument("--encoder", default="auto", help="auto | h264_videotoolbox | libx264 (default: auto)")
-    sp.add_argument("--segment-time", type=float, default=1.0,
-                    help="HLS segment length in seconds; lower = less latency (default: 1)")
+    sp.add_argument("--segment-time", type=float, default=2.0,
+                    help="HLS segment length in seconds; lower = less latency but the TV may stall (default: 2)")
     sp.add_argument("--port", type=int, default=0, help="HTTP port to serve the stream on (default: random)")
     sp.add_argument("--advertise-ip", help="IP the Cast device should fetch the stream from (default: auto)")
     sp.add_argument("--no-cursor", action="store_true", help="hide the mouse cursor")
