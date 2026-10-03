@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#FF101318</color>
+    <color name="tile">#FF1E232C</color>
+    <color name="tile_focused">#FF3A6FF7</color>
+    <color name="text">#FFF2F4F8</color>
+    <color name="text_dim">#FFA3ABB8</color>
+    <color name="jellyfin">#FFAA5CC3</color>
+    <color name="casts">#FF2FB57E</color>
+    <color name="settings">#FF8792A2</color>
+    <color name="inputs">#FFE5933A</color>
+</resources>

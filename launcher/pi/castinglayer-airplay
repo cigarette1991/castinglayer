@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Keeps the UxPlay AirPlay receiver running under the name set in the launcher's
+# Settings. The launcher restarts it by killing uxplay; this loop brings it back.
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/castinglayer/launcher.json"
+while true; do
+  name="$(python3 -c 'import json,sys,socket
+try: print(json.load(open(sys.argv[1])).get("airplay_name") or socket.gethostname())
+except Exception: print(socket.gethostname())' "$CONF")"
+  # -nh: don't append "@hostname" to the name.  -fs: full screen while mirroring.
+  uxplay -n "$name" -nh -fs || true
+  sleep 2
+done

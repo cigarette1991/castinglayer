@@ -1,0 +1,13 @@
+[Unit]
+Description=Castinglayer TV launcher (web UI + HDMI-CEC API)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=@USER@
+ExecStart=/usr/bin/python3 /opt/castinglayer-launcher/server.py --port 8080
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

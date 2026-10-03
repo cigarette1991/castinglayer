@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Castinglayer Home</title>
+<style>
+  :root {
+    --bg: #101318; --tile: #1e232c; --focus: #3a6ff7; --text: #f2f4f8; --dim: #a3abb8;
+    --jellyfin: #aa5cc3; --casts: #2fb57e; --settings: #8792a2; --inputs: #e5933a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 18px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; padding: 5vh 5vw; cursor: default; }
+  body.kiosk { cursor: none; }
+  header { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  #clock { font-size: clamp(32px, 5vw, 64px); font-weight: 300; }
+  #sub { color: var(--dim); }
+  main { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 3vw; align-content: center; }
+  .tile { aspect-ratio: 1 / 1; border: 0; border-radius: 24px; background: var(--tile); color: var(--text);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4%;
+    font: inherit; font-size: clamp(18px, 2.4vw, 34px); outline: none; transition: transform .12s, box-shadow .12s; }
+  .tile svg { width: 38%; height: 38%; }
+  .focusable:focus { box-shadow: 0 0 0 6px var(--focus); }
+  .tile:focus { transform: scale(1.06); }
+  .panel { position: fixed; inset: 0; background: var(--bg); padding: 5vh 5vw; display: none; flex-direction: column; overflow: auto; }
+  .panel.open { display: flex; }
+  .panel h1 { font-weight: 400; margin: 0 0 8px; font-size: clamp(28px, 4vw, 48px); }
+  .panel p { color: var(--dim); margin: 0 0 24px; max-width: 60ch; }
+  .rows { display: grid; gap: 12px; max-width: 720px; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 24px;
+    border: 0; border-radius: 12px; background: var(--tile); color: var(--text); font: inherit; text-align: left; outline: none; }
+  .row small { color: var(--dim); }
+  button.row:focus, input.row:focus { background: var(--focus); box-shadow: none; }
+  input.row { width: 100%; }
+  label { color: var(--dim); font-size: 15px; margin-top: 8px; }
+  #toast { position: fixed; left: 50%; bottom: 6vh; transform: translateX(-50%); background: var(--tile);
+    padding: 12px 24px; border-radius: 999px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  @media (max-width: 700px) {
+    main { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div id="clock"></div>
+  <div id="sub"></div>
+</header>
+
+<main id="home">
+  <button class="tile focusable" data-open="jellyfin">
+    <svg viewBox="0 0 24 24" fill="var(--jellyfin)"><path d="M8 5v14l11-7z"/></svg>Jellyfin
+  </button>
+  <button class="tile focusable" data-open="casts">
+    <svg viewBox="0 0 24 24" fill="var(--casts)"><path d="M21 3H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11z"/></svg>Casts
+  </button>
+  <button class="tile focusable" data-open="settings">
+    <svg viewBox="0 0 24 24" fill="var(--settings)"><path d="M19.14 12.94a7.5 7.5 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.61l-1.92-3.32a.5.5 0 0 0-.59-.22l-2.39.96a7 7 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.48-.41h-3.84a.5.5 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.5.5 0 0 0-.59.22L2.74 8.87a.5.5 0 0 0 .12.61l2.03 1.58a7.5 7.5 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.5.5 0 0 0-.12-.61zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/></svg>Settings
+  </button>
+  <button class="tile focusable" data-open="inputs">
+    <svg viewBox="0 0 24 24" fill="var(--inputs)"><path d="M21 3H3c-1.1 0-2 .9-2 2v4h2V5h18v14H3v-4H1v4c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM11 16l4-4-4-4v3H1v2h10v3z"/></svg>Inputs
+  </button>
+</main>
+
+<section class="panel" id="casts">
+  <h1>Ready to cast</h1>
+  <p>On your Mac: <b>Control Center → Screen Mirroring → <span class="airplay-name"></span></b>.
+     On an iPhone: Control Center → Screen Mirroring. Video starts within a second or two.</p>
+  <div class="rows">
+    <div class="row">AirPlay name <small class="airplay-name"></small></div>
+    <div class="row">AirPlay receiver <small id="airplay-state"></small></div>
+    <div class="row">Pi address <small class="ip"></small></div>
+    <button class="row focusable" data-action="airplay/restart">Restart AirPlay receiver</button>
+    <button class="row focusable" data-back>Back</button>
+  </div>
+</section>
+
+<section class="panel" id="inputs">
+  <h1>Inputs</h1>
+  <p id="cec-note">Switches the TV over HDMI-CEC. If an input doesn't respond, turn on CEC
+     (Anynet+, Bravia Sync, SimpLink, …) in the TV's own settings.</p>
+  <div class="rows" id="input-rows"></div>
+</section>
+
+<section class="panel" id="settings">
+  <h1>Settings</h1>
+  <p>Changes are saved on the Pi. Open <b class="url"></b> on your phone to use it as a remote.</p>
+  <form class="rows" id="settings-form">
+    <label for="jellyfin_url">Jellyfin server URL</label>
+    <input class="row focusable" id="jellyfin_url" name="jellyfin_url" placeholder="http://192.168.1.10:8096" autocomplete="off">
+    <label for="airplay_name">AirPlay name</label>
+    <input class="row focusable" id="airplay_name" name="airplay_name" maxlength="40" autocomplete="off">
+    <label for="hdmi_ports">HDMI ports on the TV</label>
+    <input class="row focusable" id="hdmi_ports" name="hdmi_ports" type="number" min="1" max="8">
+    <button class="row focusable" type="submit">Save</button>
+    <button class="row focusable" type="button" data-action="system/reboot" data-confirm="Reboot the Pi?">Reboot the Pi</button>
+    <button class="row focusable" type="button" data-back>Back</button>
+  </form>
+</section>
+
+<div id="toast"></div>
+
+<script>
+const params = new URLSearchParams(location.search);
+// The TV's kiosk browser opens ?kiosk=1; any other browser (a phone) acts as a remote.
+const KIOSK = params.has("kiosk");
+document.body.classList.toggle("kiosk", KIOSK);
+let status = {};
+
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove("show"), 2500);
+}
+
+async function api(path, body) {
+  const res = await fetch("/api/" + path, {
+    method: body === undefined && path === "status" ? "GET" : "POST",
+    headers: { "Content-Type": "application/json" },
+    body: path === "status" ? undefined : JSON.stringify(body || {}),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+function tickClock() {
+  $("#clock").textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+async function refresh() {
+  try { status = await api("status"); } catch { return; }
+  $$(".airplay-name").forEach(e => e.textContent = status.airplay_name);
+  $$(".ip").forEach(e => e.textContent = status.ip || "offline");
+  $$(".url").forEach(e => e.textContent = `http://${status.ip || status.hostname}:${location.port || 80}`);
+  $("#airplay-state").textContent = status.airplay_running ? "running" : "starting…";
+  $("#sub").textContent = `${status.airplay_name} · ${status.ip || "offline"}`;
+  buildInputs();
+}
+
+function buildInputs() {
+  const rows = $("#input-rows");
+  const ports = status.hdmi_ports || 4;
+  if (status.cec === false) $("#cec-note").textContent = "HDMI-CEC isn't available on this Pi (needs /dev/cec0 and cec-ctl).";
+  if (rows.dataset.ports == ports) return;  // unchanged: keep the rows (and focus) as they are
+  rows.dataset.ports = ports;
+  rows.innerHTML = "";
+  const add = (label, action, detail) => {
+    const b = document.createElement("button");
+    b.className = "row focusable";
+    b.dataset.action = action;
+    b.innerHTML = `${label}${detail ? ` <small>${detail}</small>` : ""}`;
+    rows.append(b);
+  };
+  add("This Pi (launcher, AirPlay)", "tv/pi");
+  for (let i = 1; i <= ports; i++) add(`HDMI ${i}`, `tv/hdmi/${i}`);
+  add("Turn TV on", "tv/on");
+  add("Turn TV off", "tv/off");
+  const back = document.createElement("button");
+  back.className = "row focusable"; back.dataset.back = ""; back.textContent = "Back";
+  rows.append(back);
+}
+
+function openPanel(id) {
+  if (id === "jellyfin") return openJellyfin();
+  $$(".panel").forEach(p => p.classList.toggle("open", p.id === id));
+  if (id === "settings") {
+    $("#jellyfin_url").value = status.jellyfin_url || "";
+    $("#airplay_name").value = status.airplay_name || "";
+    $("#hdmi_ports").value = status.hdmi_ports || 4;
+  }
+  $(`#${id} .focusable`)?.focus();
+  history.pushState({ panel: id }, "");
+}
+
+function closePanels() {
+  const open = $(".panel.open");
+  $$(".panel").forEach(p => p.classList.remove("open"));
+  if (open) $(`[data-open="${open.id}"]`)?.focus();
+}
+
+function openJellyfin() {
+  if (!status.jellyfin_url) {
+    toast("Set your Jellyfin server URL first");
+    return openPanel("settings");
+  }
+  if (KIOSK) location.href = status.jellyfin_url;
+  else window.open(status.jellyfin_url, "_blank");
+}
+
+document.addEventListener("click", async e => {
+  const el = e.target.closest("[data-open],[data-action],[data-back]");
+  if (!el) return;
+  if (el.dataset.open) return openPanel(el.dataset.open);
+  if ("back" in el.dataset) return history.back();
+  if (el.dataset.confirm && !confirm(el.dataset.confirm)) return;
+  try {
+    await api(el.dataset.action);
+    toast("Done");
+    setTimeout(refresh, 1500);
+  } catch (err) { toast(err.message); }
+});
+
+$("#settings-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  body.hdmi_ports = Number(body.hdmi_ports);
+  try { await api("config", body); toast("Saved"); refresh(); }
+  catch (err) { toast(err.message); }
+});
+
+window.addEventListener("popstate", closePanels);
+
+// D-pad / arrow-key navigation: move focus to the nearest focusable in that direction.
+function visibleFocusables() {
+  const open = $(".panel.open");
+  return $$(".focusable", open || $("#home")).filter(el => el.offsetParent !== null);
+}
+function moveFocus(dx, dy) {
+  const items = visibleFocusables();
+  const cur = document.activeElement;
+  if (!items.includes(cur)) return items[0]?.focus();
+  const a = cur.getBoundingClientRect();
+  const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+  let best = null, bestScore = Infinity;
+  for (const el of items) {
+    if (el === cur) continue;
+    const b = el.getBoundingClientRect();
+    const vx = b.left + b.width / 2 - ax, vy = b.top + b.height / 2 - ay;
+    const along = vx * dx + vy * dy;
+    if (along <= 1) continue;
+    const across = Math.abs(vx * dy - vy * dx);
+    const score = along + across * 2;
+    if (score < bestScore) { bestScore = score; best = el; }
+  }
+  best?.focus();
+  best?.scrollIntoView({ block: "nearest" });
+}
+document.addEventListener("keydown", e => {
+  const typing = e.target.tagName === "INPUT" && !["ArrowUp", "ArrowDown", "Escape"].includes(e.key);
+  if (typing) return;
+  const dirs = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  if (dirs[e.key]) { e.preventDefault(); moveFocus(...dirs[e.key]); }
+  else if (["Escape", "Backspace", "BrowserBack"].includes(e.key) && $(".panel.open")) { e.preventDefault(); history.back(); }
+});
+
+tickClock();
+setInterval(tickClock, 15000);
+refresh();
+setInterval(refresh, 10000);
+$(".tile").focus();
+</script>
+</body>
+</html>

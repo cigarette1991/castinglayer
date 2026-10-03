@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Castinglayer Home</string>
+    <string name="tile_jellyfin">Jellyfin</string>
+    <string name="tile_casts">Casts</string>
+    <string name="tile_settings">Settings</string>
+    <string name="tile_inputs">Inputs</string>
+    <string name="casts_title">Ready to cast</string>
+    <string name="casts_body">On your Mac, run <b>castlayer</b>, or in Chrome choose ⋮ → Cast… → Cast screen.\nFrom a phone, tap the Cast icon in any app.</string>
+    <string name="inputs_title">Inputs</string>
+    <string name="inputs_none">This TV doesn\'t report any HDMI inputs to apps.</string>
+    <string name="jellyfin_missing">Jellyfin isn\'t installed. From your computer run: ./tv.sh jellyfin</string>
+    <string name="open_failed">Couldn\'t open that on this TV.</string>
+</resources>
