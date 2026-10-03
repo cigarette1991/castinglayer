@@ -24,23 +24,34 @@ Live on Living Room TV. Press Ctrl+C to stop.
 3. `pychromecast` finds devices over mDNS. It tells the Default Media Receiver on the chosen device to play the stream as `LIVE`.
 4. Pressing Ctrl+C closes the receiver app, stops ffmpeg, and removes the temporary files.
 
-## Install
+## Install (one time)
+
+Open **Terminal** on your Mac and paste:
 
 ```bash
-brew install ffmpeg
-pipx install git+https://github.com/cigarette1991/castinglayer.git
-# or from a clone:  python3 -m pip install -e .
-castlayer doctor
+git clone https://github.com/cigarette1991/castinglayer.git && cd castinglayer && ./install.sh
 ```
 
-**Screen Recording permission:** the first time you run it, macOS asks whether your terminal app (Terminal, iTerm, …) may record the screen. You can also turn this on yourself in **System Settings → Privacy & Security → Screen Recording**. Restart the terminal afterwards. The macOS firewall may also ask whether Python can accept incoming connections. Allow it, because the Cast device pulls the video from your Mac.
+This installs Homebrew (if needed), ffmpeg, and the `castlayer` command.
+
+## Cast your screen
+
+Turn the TV on, then run:
+
+```bash
+castlayer
+```
+
+It finds your TV and starts mirroring. If you have more than one TV, it asks which one and remembers your choice. Press **Ctrl+C** to stop.
+
+The first time, macOS asks you to allow **Screen Recording** for your terminal app. Allow it, quit the terminal (Cmd+Q), reopen it, and run `castlayer` again. If macOS asks about **Local Network** access or incoming connections, allow those too: they let the Mac find the TV and let the TV fetch the video.
 
 ## Usage
 
 ```bash
 castlayer devices                 # list Cast devices on the network
 castlayer displays                # list screens and audio inputs
-castlayer cast                    # cast the main screen (if only one Cast device exists)
+castlayer                         # cast the main screen (asks which TV if there are several)
 castlayer cast -d kitchen -s 1    # second display to "Kitchen Display" (partial names ok)
 castlayer cast -r 720p --fps 24 -b 3M   # lighter stream for weak Wi-Fi
 castlayer stop -d "Living Room"   # stop casting on a device

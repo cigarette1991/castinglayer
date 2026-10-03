@@ -34,3 +34,15 @@ def test_server_serves_hls_with_cors(tmp_path):
 
 def test_local_ip_for_loopback():
     assert local_ip_for("127.0.0.1") == "127.0.0.1"
+
+
+
+def test_no_command_means_cast(monkeypatch):
+    import castinglayer.cli as cli
+
+    calls = []
+    monkeypatch.setattr(cli, "cmd_cast", lambda a: calls.append(a) or 0)
+    assert cli.main([]) == 0
+    assert cli.main(["-d", "TV"]) == 0
+    assert [a.command for a in calls] == ["cast", "cast"]
+    assert calls[1].device == "TV"

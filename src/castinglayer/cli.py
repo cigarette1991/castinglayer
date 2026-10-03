@@ -32,6 +32,9 @@ from .capture import (
 from .server import StreamServer, local_ip_for
 
 MEDIA_RECEIVER_APP_ID = "CC1AD845"
+CONFIG_DIR = Path.home() / ".config" / "castinglayer"
+LAST_DEVICE_FILE = CONFIG_DIR / "last_device"
+SCREEN_RECORDING_SETTINGS = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
 
 
 def _err(msg: str) -> None:
@@ -140,11 +143,68 @@ def cmd_stop(args) -> int:
         stop_discovery(browser)
 
 
+def _remembered_device() -> Optional[str]:
+    try:
+        return LAST_DEVICE_FILE.read_text().strip() or None
+    except OSError:
+        return None
+
+
+def _remember_device(name: str) -> None:
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        LAST_DEVICE_FILE.write_text(name + "\n")
+    except OSError:
+        pass
+
+
+def _select_device(casts, name: Optional[str]):
+    """Pick a device: explicit name > only device > last used > interactive menu."""
+    from .cast import CastError, choose
+
+    if not casts:
+        raise CastError(
+            "No TVs / Cast devices found. Check that:\n"
+            "  - the TV is on and on the same Wi-Fi as this Mac (not a guest network)\n"
+            "  - your terminal app is allowed in System Settings > Privacy & Security > Local Network\n"
+            "  - or pass the TV's IP address directly: castlayer --host 192.168.1.50"
+        )
+    if name is not None or len(casts) == 1:
+        return choose(casts, name)
+    last = _remembered_device()
+    for c in casts:
+        if last and c.cast_info.friendly_name == last:
+            return c
+    if not sys.stdin.isatty():
+        return choose(casts, None)  # raises with the list of names
+    _info("Which TV?")
+    for i, c in enumerate(casts, 1):
+        _info(f"  {i}) {c.cast_info.friendly_name}  ({c.cast_info.model_name})")
+    while True:
+        answer = input(f"Enter 1-{len(casts)}: ").strip()
+        if answer.isdigit() and 1 <= int(answer) <= len(casts):
+            return casts[int(answer) - 1]
+
+
+def _screen_permission_help() -> None:
+    _err(
+        "macOS is blocking screen capture.\n"
+        "  1. In the System Settings window that just opened, turn on your terminal app\n"
+        "     (Terminal / iTerm) under Privacy & Security > Screen Recording.\n"
+        "  2. Quit the terminal completely (Cmd+Q), reopen it, and run castlayer again."
+    )
+    if platform.system() == "Darwin":
+        subprocess.run(["open", SCREEN_RECORDING_SETTINGS], check=False)
+
+
 def cmd_cast(args) -> int:
-    from .cast import CastError, choose, discover, play_hls, stop_discovery
+    from .cast import CastError, discover, play_hls, stop_discovery
 
     ffmpeg = find_ffmpeg()
     devices = list_devices(ffmpeg)
+    if not devices.screens:
+        _screen_permission_help()
+        return 1
     screen = resolve_screen(devices, args.screen)
     audio = resolve_audio(devices, args.audio)
     encoder = pick_encoder(args.encoder, ffmpeg)
@@ -163,7 +223,7 @@ def cmd_cast(args) -> int:
     signal.signal(signal.SIGTERM, _raise_interrupt)
 
     try:
-        cast = choose(casts, args.device)
+        cast = _select_device(casts, args.device)
         name = cast.cast_info.friendly_name
         lan_ip = args.advertise_ip or local_ip_for(cast.cast_info.host)
 
@@ -198,6 +258,7 @@ def cmd_cast(args) -> int:
         _info(f"Casting to {name}...")
         play_hls(cast, url, title=f"{socket.gethostname()} - {screen.name}")
         started_playback = True
+        _remember_device(name)
         _info(f"Live on {name}. Press Ctrl+C to stop.")
 
         return _monitor(cast, ffmpeg_proc, log_path)
@@ -278,6 +339,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="castlayer",
         description="Mirror your macOS display to a Google Cast device (Chromecast, Google TV, Nest Hub).",
+        epilog="Run `castlayer` with no command to start casting your main screen.",
     )
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = p.add_subparsers(dest="command", metavar="COMMAND")
@@ -328,6 +390,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
+    argv = list(sys.argv[1:] if argv is None else argv)
+    commands = {"devices", "displays", "doctor", "stop", "cast"}
+    # Plain `castlayer` (optionally with cast options) just starts casting.
+    if not argv or (argv[0] not in commands and argv[0] not in ("-h", "--help", "--version")):
+        argv.insert(0, "cast")
     args = parser.parse_args(argv)
     if not getattr(args, "func", None):
         parser.print_help()
