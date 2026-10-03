@@ -329,27 +329,38 @@ def _segments_behind(playlist: Path, fetched: Optional[str]) -> int:
 
 
 def _monitor(cast, proc, log_path: Path, server=None, reload=None, playlist: Optional[Path] = None,
-             stall_after: float = 10.0) -> int:
+             stall_after: float = 10.0, max_error_reloads: int = 5) -> int:
     seen_playing = False
     reloaded_at = None
+    behind_since = None  # when the receiver first fell 3+ segments behind the playlist
     warned_slow_at = 0.0
+    error_reloads = 0
+
+    def do_reload(why: str) -> None:
+        nonlocal reloaded_at, behind_since, seen_playing
+        _info(why)
+        now = time.monotonic()
+        server.httpd.last_segment_at = reloaded_at = now
+        behind_since = None
+        try:
+            reload()
+        except Exception as e:  # keep casting; the next check retries
+            _err(f"Reload failed: {e}")
+
     while True:
+        now = time.monotonic()
         last = server.last_segment_at if server is not None else None
-        if reload is not None and last is not None and time.monotonic() - last > stall_after:
-            if playlist is not None and _segments_behind(playlist, server.last_segment) >= 3:
-                # The Google TV receiver sometimes stops fetching segments for minutes while
-                # still reporting PLAYING. Reloading puts it back on the live edge.
-                _info("Receiver stalled; reloading the stream.")
-                server.httpd.last_segment_at = time.monotonic()
-                reloaded_at = time.monotonic()
-                try:
-                    reload()
-                except Exception as e:  # keep casting; the next stall check retries
-                    _err(f"Reload failed: {e}")
-            elif time.monotonic() - warned_slow_at > 60:
-                # No new segments: capture/encoding can't keep up, usually because the Mac is busy.
+        if reload is not None and last is not None:
+            behind = playlist is not None and _segments_behind(playlist, server.last_segment) >= 3
+            behind_since = (behind_since or now) if behind else None
+            if behind_since is not None and now - behind_since > stall_after and now - last > stall_after:
+                # Segments have been waiting a while and the receiver isn't fetching them: the
+                # Google TV receiver sometimes gets stuck like this while still reporting PLAYING.
+                do_reload("Receiver stalled; reloading the stream.")
+            elif not behind and now - last > stall_after and now - warned_slow_at > 60:
+                # No new segments to fetch: capture can't keep up, usually because the Mac is busy.
                 _info("The Mac is falling behind (busy CPU?); the TV will pause until it catches up.")
-                warned_slow_at = time.monotonic()
+                warned_slow_at = now
         if proc.poll() is not None:
             _err(f"ffmpeg stopped unexpectedly (code {proc.returncode}):\n{_log_tail(log_path)}")
             return 1
@@ -357,21 +368,26 @@ def _monitor(cast, proc, log_path: Path, server=None, reload=None, playlist: Opt
         state = status.player_state if status else None
         if state in ("PLAYING", "BUFFERING"):
             seen_playing = True
+            if reloaded_at is not None and now - reloaded_at > 15:
+                error_reloads = 0
         if cast.app_id != MEDIA_RECEIVER_APP_ID and seen_playing:
             _info("Cast session ended on the receiver.")
             return 0
         if seen_playing and state == "IDLE":
             reason = getattr(status, "idle_reason", None)
             # A reload ends the old session as INTERRUPTED, sometimes after the new one is playing.
-            if reason == "INTERRUPTED" and reloaded_at is not None and time.monotonic() - reloaded_at < 15:
+            if reason == "INTERRUPTED" and reloaded_at is not None and now - reloaded_at < 15:
                 cast.media_controller.update_status()  # fetch the new session's state
-                time.sleep(0.5)
-                continue
-            if reason == "ERROR":
+            elif reason == "ERROR" and reload is not None and error_reloads < max_error_reloads:
+                error_reloads += 1
+                seen_playing = False
+                do_reload("The receiver reported a playback error; reloading the stream.")
+            elif reason == "ERROR":
                 _err("The receiver reported a playback error.")
                 return 1
-            _info(f"Receiver went idle ({reason or 'stopped'}).")
-            return 0
+            else:
+                _info(f"Receiver went idle ({reason or 'stopped'}).")
+                return 0
         time.sleep(0.5)
 
 

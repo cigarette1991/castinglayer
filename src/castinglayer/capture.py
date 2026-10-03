@@ -193,6 +193,8 @@ def build_command(ffmpeg: str, settings: CaptureSettings, out_dir: Path) -> List
         "-f", "hls",
         "-hls_time", str(s.segment_time),
         "-hls_list_size", str(s.list_size),
+        # Keep old segments on disk a while, so a receiver that fell behind gets them, not a 404.
+        "-hls_delete_threshold", str(s.list_size),
         "-hls_flags", "delete_segments+independent_segments+omit_endlist",
         "-hls_allow_cache", "0",
         "-hls_segment_type", "mpegts",

@@ -88,3 +88,28 @@ def test_monitor_reloads_only_when_receiver_is_stuck(tmp_path):
         assert reloads and result == 1  # kept casting after the reload
     finally:
         server.stop()
+
+
+def test_monitor_reloads_after_playback_error(tmp_path):
+    from types import SimpleNamespace
+    from castinglayer import cli
+
+    mc = SimpleNamespace(status=SimpleNamespace(player_state="PLAYING", idle_reason=None),
+                         update_status=lambda: None)
+    reloads, polls = [], []
+
+    def poll():
+        polls.append(1)
+        if len(polls) == 2:  # receiver hits an error (e.g. a 404 after falling behind)
+            mc.status = SimpleNamespace(player_state="IDLE", idle_reason="ERROR")
+        return 1 if len(polls) > 4 else None
+
+    def reload():
+        reloads.append(1)
+        mc.status = SimpleNamespace(player_state="PLAYING", idle_reason=None)
+
+    server = SimpleNamespace(last_segment_at=None, httpd=SimpleNamespace())
+    cast = SimpleNamespace(app_id=cli.MEDIA_RECEIVER_APP_ID, media_controller=mc)
+    result = cli._monitor(cast, SimpleNamespace(poll=poll, returncode=1), tmp_path / "log",
+                          server=server, reload=reload)
+    assert reloads == [1] and result == 1  # kept casting until ffmpeg stopped
